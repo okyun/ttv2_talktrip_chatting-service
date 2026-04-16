@@ -1,0 +1,5 @@
+# Docker(tt/docker-compose): compose 가 넣는 jdbc:mysql URL 과 드라이버를 일치시킨다.
+# 기본 application.yaml 은 P6Spy 드라이버라, URL 만 jdbc:mysql 로 덮어쓰면 Hibernate 가 메타데이터를 못 읽어 Dialect 오류가 난다.
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
