@@ -91,7 +91,7 @@ public class ChatService {
                 .roomId(newRoomId)
                 .title("product:" + req.getProductId())
                 .productId(req.getProductId())
-                .roomType(RoomType.BUYER_SELLER)
+                .roomType(RoomType.DIRECT)
                 .build();
         chatRoomRepository.save(chatRoom);
 
