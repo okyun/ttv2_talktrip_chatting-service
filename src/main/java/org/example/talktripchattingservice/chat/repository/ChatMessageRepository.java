@@ -81,5 +81,14 @@ public interface ChatMessageRepository extends JpaRepository<ChattingMessageHist
         WHERE m.roomId = :roomId
     """)
     Long findMaxSequenceNumberByRoomId(@Param("roomId") String roomId);
+
+    @Query(value = """
+            SELECT m.message
+            FROM chatting_message_history_tab m
+            WHERE m.room_id = :roomId
+            ORDER BY m.sequence_number DESC, m.created_at DESC, m.message_id DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    List<String> findLatestMessageTextByRoomId(@Param("roomId") String roomId);
 }
 

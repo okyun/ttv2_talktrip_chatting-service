@@ -60,7 +60,8 @@ public class ChatApiController {
         return Map.of("count", count);
     }
 
-    @PostMapping("/rooms/enter")
+    @PostMapping("" +
+            "/rooms/enter")
     public ResponseEntity<ChatRoomResponseDto> enterOrCreateRoom(
             Principal principal,
             @RequestBody ChatRoomRequestDto chatRoomRequestDto
