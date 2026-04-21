@@ -10,6 +10,7 @@ import org.example.talktripchattingservice.chat.entity.ChattingMessageHistory;
 import org.example.talktripchattingservice.chat.entity.ChatRoom;
 import org.example.talktripchattingservice.chat.entity.ChatRoomAccount;
 import org.example.talktripchattingservice.chat.enums.RoomType;
+import org.example.talktripchattingservice.chat.redis.ChatRoomRedisSummaryService;
 import org.example.talktripchattingservice.chat.redis.RedisMessageBroker;
 import org.example.talktripchattingservice.chat.repository.ChatMessageRepository;
 import org.example.talktripchattingservice.chat.repository.ChatRoomMemberRepository;
@@ -46,7 +47,7 @@ public class ChatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final RedisMessageBroker redisMessageBroker;
     private final org.example.talktripchattingservice.chat.config.ChatRedisProperties chatRedisProperties;
-    private final org.example.talktripchattingservice.chat.redis.ChatRoomRedisIndexService chatRoomRedisIndexService;
+    private final ChatRoomRedisSummaryService chatRoomRedisSummaryService;
 
     @Transactional
     public void saveAndSend(ChatMessageRequestDto dto, Principal principal) {
@@ -82,7 +83,7 @@ public class ChatService {
         var createdAtRef = entity.getCreatedAt();
         var messageRef = entity.getMessage();
         runChatRoomIndexAfterCommit(
-                () -> chatRoomRedisIndexService.onMessageSent(roomIdRef, createdAtRef, messageRef)
+                () -> chatRoomRedisSummaryService.onMessageSent(roomIdRef, createdAtRef, messageRef)
         );
     }
 
@@ -94,7 +95,7 @@ public class ChatService {
         Optional<String> existing = chatRoomMemberRepository.findRoomIdByBuyerIdAndSellerId(buyerEmail, sellerEmail);
         if (existing.isPresent()) {
             String roomId = existing.get();
-            runChatRoomIndexAfterCommit(() -> chatRoomRedisIndexService.syncSingleRoomFromDb(roomId));
+            runChatRoomIndexAfterCommit(() -> chatRoomRedisSummaryService.syncSingleRoomFromDb(roomId));
             return roomId;
         }
 
@@ -113,11 +114,7 @@ public class ChatService {
         chatRoomMemberRepository.save(ChatRoomAccount.create(newRoomId, sellerEmail));
 
         LocalDateTime indexTime = chatRoom.getUpdatedAt() != null ? chatRoom.getUpdatedAt() : SeoulTimeUtil.now();
-        runChatRoomIndexAfterCommit(() -> chatRoomRedisIndexService.onRoomCreated(
-                List.of(buyerEmail, sellerEmail),
-                newRoomId,
-                indexTime
-        ));
+        runChatRoomIndexAfterCommit(() -> chatRoomRedisSummaryService.onRoomCreated(newRoomId, indexTime));
 
         return newRoomId;
     }
@@ -125,7 +122,6 @@ public class ChatService {
     @Transactional
     public void markChatRoomAsDeleted(String accountEmail, String roomId) {
         chatRoomMemberRepository.updateIsDelByMemberIdAndRoomId(accountEmail, roomId, 1);
-        runChatRoomIndexAfterCommit(() -> chatRoomRedisIndexService.removeRoomForMember(accountEmail, roomId));
     }
 
     @Transactional
@@ -173,9 +169,6 @@ public class ChatService {
     }
 
     private void runChatRoomIndexAfterCommit(Runnable action) {
-        if (!chatRedisProperties.roomListIndexEnabled()) {
-            return;
-        }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             action.run();
             return;
