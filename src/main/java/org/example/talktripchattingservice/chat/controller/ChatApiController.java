@@ -60,15 +60,13 @@ public class ChatApiController {
         return Map.of("count", count);
     }
 
-    @PostMapping("" +
-            "/rooms/enter")
-    public ResponseEntity<ChatRoomResponseDto> enterOrCreateRoom(
-            Principal principal,
-            @RequestBody ChatRoomRequestDto chatRoomRequestDto
+    @PostMapping("/rooms/enter")
+    public ResponseEntity<ChatRoomResponseDto> enterOrCreateRoom(Principal principal, @RequestBody ChatRoomRequestDto chatRoomRequestDto
     ) {
         requirePrincipal(principal);
-        String roomId = chatService.enterOrCreateRoom(principal, chatRoomRequestDto);
-        return ResponseEntity.ok(new ChatRoomResponseDto(roomId));
+        chatRoomRequestDto.setTitle(chatRoomRequestDto.getTitle());
+        ChatRoomResponseDto resp = chatService.enterOrCreateRoom(principal, chatRoomRequestDto);
+        return ResponseEntity.ok(resp);
     }
 
     @PatchMapping("/me/chatRooms/{roomId}/markAsRead")

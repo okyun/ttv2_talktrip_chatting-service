@@ -88,23 +88,26 @@ public class ChatService {
     }
 
     @Transactional
-    public String enterOrCreateRoom(Principal principal, ChatRoomRequestDto req) {
+    public ChatRoomResponseDto enterOrCreateRoom(Principal principal, ChatRoomRequestDto req) {
         String buyerEmail = principal.getName();
         String sellerEmail = req.getSellerAccountEmail();
+        //req.setProductName();
 
         Optional<String> existing = chatRoomMemberRepository.findRoomIdByBuyerIdAndSellerId(buyerEmail, sellerEmail);
         if (existing.isPresent()) {
             String roomId = existing.get();
             runChatRoomIndexAfterCommit(() -> chatRoomRedisSummaryService.syncSingleRoomFromDb(roomId));
-            return roomId;
+            return new ChatRoomResponseDto(roomId);
         }
 
         ChatRoomResponseDto newRoomDto = ChatRoomResponseDto.createNew();
         String newRoomId = newRoomDto.getRoomId();
 
+
+
         ChatRoom chatRoom = ChatRoom.builder()
                 .roomId(newRoomId)
-                .title("product:" + req.getProductId())
+                .title(req.getTitle())
                 .productId(req.getProductId())
                 .roomType(RoomType.DIRECT)
                 .build();
@@ -116,7 +119,7 @@ public class ChatService {
         LocalDateTime indexTime = chatRoom.getUpdatedAt() != null ? chatRoom.getUpdatedAt() : SeoulTimeUtil.now();
         runChatRoomIndexAfterCommit(() -> chatRoomRedisSummaryService.onRoomCreated(newRoomId, indexTime));
 
-        return newRoomId;
+        return new ChatRoomResponseDto(newRoomId, req.getTitle());
     }
 
     @Transactional

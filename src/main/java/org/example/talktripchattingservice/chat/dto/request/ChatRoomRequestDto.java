@@ -7,5 +7,6 @@ public class ChatRoomRequestDto {
     private String buyerAccountEmail;
     private String sellerAccountEmail;
     private int productId;
+    private String title;
 }
 
