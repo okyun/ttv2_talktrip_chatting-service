@@ -8,11 +8,14 @@ import org.example.talktripchattingservice.chat.dto.response.ChatMessagePush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +28,8 @@ import java.util.UUID;
  * - onMessage: senderInstanceId가 자기 자신이면 무시, 아니면 WebSocket으로 fan-out
  */
 @Component
-public class RedisMessageBroker implements MessageListener {
+@ConditionalOnProperty(name = "chat.redis.broadcast-mode", havingValue = "pubsub", matchIfMissing = true)
+public class RedisMessageBroker implements MessageListener, ClusterBroadcastBroker {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisMessageBroker.class);
 
@@ -68,7 +72,13 @@ public class RedisMessageBroker implements MessageListener {
     }
 
     @Override
-    public void onMessage(Message message, byte[] pattern) {
+    public void publishRoomMessage(String roomId, Object payload) {
+        String channel = props.pubsubPrefix() + ":room:" + roomId;
+        publishToOtherInstances(channel, payload);
+    }
+
+    @Override
+    public void onMessage(@NonNull Message message, @Nullable byte[] pattern) {
         String channel = new String(message.getChannel());
         String payload = new String(message.getBody());
         try {

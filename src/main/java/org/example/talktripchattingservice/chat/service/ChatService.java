@@ -11,7 +11,7 @@ import org.example.talktripchattingservice.chat.entity.ChatRoom;
 import org.example.talktripchattingservice.chat.entity.ChatRoomAccount;
 import org.example.talktripchattingservice.chat.enums.RoomType;
 import org.example.talktripchattingservice.chat.redis.ChatRoomRedisSummaryService;
-import org.example.talktripchattingservice.chat.redis.RedisMessageBroker;
+import org.example.talktripchattingservice.chat.redis.ClusterBroadcastBroker;
 import org.example.talktripchattingservice.chat.repository.ChatMessageRepository;
 import org.example.talktripchattingservice.chat.repository.ChatRoomMemberRepository;
 import org.example.talktripchattingservice.chat.repository.ChatRoomRepository;
@@ -45,8 +45,7 @@ public class ChatService {
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatMessageSequenceService chatMessageSequenceService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final RedisMessageBroker redisMessageBroker;
-    private final org.example.talktripchattingservice.chat.config.ChatRedisProperties chatRedisProperties;
+    private final ClusterBroadcastBroker clusterBroadcastBroker;
     private final ChatRoomRedisSummaryService chatRoomRedisSummaryService;
 
     @Transactional
@@ -74,8 +73,7 @@ public class ChatService {
         messagingTemplate.convertAndSend(dest, push);
 
         // 다른 인스턴스에도 전파
-        String roomChannel = chatRedisProperties.pubsubPrefix() + ":room:" + dto.getRoomId();
-        redisMessageBroker.publishToOtherInstances(roomChannel, push);
+        clusterBroadcastBroker.publishRoomMessage(dto.getRoomId(), push);
 
         logger.info("메시지 발송 완료: roomId={}, messageId={}", dto.getRoomId(), entity.getMessageId());
 
