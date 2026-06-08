@@ -1,0 +1,14 @@
+# 통합 테스트: 로컬 MySQL 스키마 chatTest (미리 생성하거나 ddl-auto 로 생성)
+spring:
+  datasource:
+    url: jdbc:p6spy:mysql://localhost:3306/chatTest?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8&useUnicode=true
+    username: talktrip
+    password: talktrip123
+    driver-class-name:com.p6spy.engine.spy.P6SpyDriver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: create-drop

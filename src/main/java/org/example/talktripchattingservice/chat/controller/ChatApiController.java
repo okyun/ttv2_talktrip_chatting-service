@@ -6,7 +6,9 @@ import org.example.talktripchattingservice.chat.dto.response.ChatMemberRoomWithM
 import org.example.talktripchattingservice.chat.dto.response.ChatRoomDTO;
 import org.example.talktripchattingservice.chat.dto.response.ChatRoomResponseDto;
 import org.example.talktripchattingservice.chat.service.ChatRoomQueryService;
+import org.example.talktripchattingservice.chat.service.ChatRoomQueryRedisOverlayService;
 import org.example.talktripchattingservice.chat.service.ChatService;
+import org.example.talktripchattingservice.chat.redis.UnreadTotalRedisCacheService;
 import org.example.talktripchattingservice.common.dto.SliceResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,8 @@ public class ChatApiController {
 
     private final ChatService chatService;
     private final ChatRoomQueryService chatRoomQueryService;
+    private final ChatRoomQueryRedisOverlayService chatRoomQueryRedisOverlayService;
+    private final UnreadTotalRedisCacheService unreadTotalRedisCacheService;
 
     @PostMapping
     public void enterChatRoom() {}
@@ -35,6 +39,18 @@ public class ChatApiController {
             @RequestParam(required = false) String cursor
     ) {
         return chatRoomQueryService.getRooms(requireEmail(principal), limit, cursor);
+    }
+
+    /**
+     * 비교/벤치마크용: 목록은 RDB(페이지네이션/정렬) + lastMessage는 Redis Hash 캐시로 덮어씀.
+     */
+    @GetMapping("/me/chatRooms/redis")
+    public SliceResponse<ChatRoomDTO> getMyChatsRedisOverlay(
+            Principal principal,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String cursor
+    ) {
+        return chatRoomQueryRedisOverlayService.getRoomsOverlayLastMessage(requireEmail(principal), limit, cursor);
     }
 
     @GetMapping("/me/chatRooms/all")
@@ -57,6 +73,15 @@ public class ChatApiController {
     @GetMapping("/countALLUnreadMessages")
     public Map<String, Integer> getCountAllUnreadMessages(Principal principal) {
         int count = chatRoomQueryService.getCountAllUnreadMessages(requireEmail(principal));
+        return Map.of("count", count);
+    }
+
+    /**
+     * 비교/벤치마크용: "전체 unread 합산"을 Redis 짧은 TTL 캐시로 응답.
+     */
+    @GetMapping("/countALLUnreadMessages/redis")
+    public Map<String, Integer> getCountAllUnreadMessagesRedis(Principal principal) {
+        int count = unreadTotalRedisCacheService.getTotalUnreadCached(requireEmail(principal));
         return Map.of("count", count);
     }
 

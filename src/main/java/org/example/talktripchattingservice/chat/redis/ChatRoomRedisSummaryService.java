@@ -1,7 +1,6 @@
 package org.example.talktripchattingservice.chat.redis;
 
 import lombok.RequiredArgsConstructor;
-import org.example.talktripchattingservice.chat.config.ChatRedisProperties;
 import org.example.talktripchattingservice.chat.entity.ChatRoom;
 import org.example.talktripchattingservice.chat.repository.ChatMessageRepository;
 import org.example.talktripchattingservice.chat.repository.ChatRoomRepository;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,7 +32,7 @@ public class ChatRoomRedisSummaryService {
 
     @Qualifier("chatRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
-    private final ChatRedisProperties chatRedisProperties;
+    private final ChatRedisKeys chatRedisKeys;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
 
@@ -48,32 +48,59 @@ public class ChatRoomRedisSummaryService {
      * summary miss 또는 Redis flush 이후 단건 복구용.
      */
     public void syncSingleRoomFromDb(String roomId) {
-        ChatRoom room = chatRoomRepository.findById(roomId).orElse(null);
+        String rid = requireRoomId(roomId);
+        ChatRoom room = chatRoomRepository.findById(rid).orElse(null);
         if (room == null) {
             return;
         }
-        List<String> lastRows = chatMessageRepository.findLatestMessageTextByRoomId(roomId);
+        List<String> lastRows = chatMessageRepository.findLatestMessageTextByRoomId(rid);
         String lastBody = lastRows.isEmpty() ? "" : (lastRows.getFirst() == null ? "" : lastRows.getFirst());
         LocalDateTime ua = room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now(SEOUL);
-        writeLastMessage(roomId, lastBody, ua);
+        writeLastMessage(rid, lastBody, ua);
     }
 
+    /**
+     * 마지막 메시지 본문 조회 ({@code ho.get}).
+     *
+     * <pre>
+     * redis-cli HGET "chat:cache:rId:&lt;roomId&gt;:last" body
+     * </pre>
+     */
     public java.util.Optional<String> getLastMessageBody(String roomId) {
+        String rid = requireRoomId(roomId);
         HashOperations<String, String, String> ho = redisTemplate.opsForHash();
-        String v = Objects.requireNonNull(ho).get(lastHashKey(roomId), LAST_FIELD_BODY);
+        String key = Objects.requireNonNull(lastHashKey(rid));
+        // ho.get(key, "body") == redis-cli HGET "<key>" body
+        String v = ho.get(key, LAST_FIELD_BODY);
         return v == null ? java.util.Optional.empty() : java.util.Optional.of(v);
     }
 
+    /**
+     * Redis Hash summary 쓰기 ({@code ho.putAll}).
+     *
+     * <p>키: {@code chat:cache:rId:<roomId>:last} (Cluster면 {@code chat:cache:rId:{chatRoom:<roomId>}:last})</p>
+     *
+     * <pre>
+     * redis-cli HSET "chat:cache:rId:&lt;roomId&gt;:last" body "&lt;messageBody&gt;" at "&lt;updatedAt&gt;"
+     * redis-cli HGETALL "chat:cache:rId:&lt;roomId&gt;:last"
+     * </pre>
+     */
     private void writeLastMessage(String roomId, String body, LocalDateTime at) {
-        Map<String, String> m = Map.of(
-                LAST_FIELD_BODY, body == null ? "" : body,
-                LAST_FIELD_AT, at == null ? "" : at.toString()
-        );
-        Objects.requireNonNull(redisTemplate.opsForHash()).putAll(lastHashKey(roomId), m);
+        String rid = requireRoomId(roomId);
+        String key = Objects.requireNonNull(lastHashKey(rid));
+        Map<String, String> m = new HashMap<>();
+        m.put(LAST_FIELD_BODY, body == null ? "" : body);
+        m.put(LAST_FIELD_AT, at == null ? "" : at.toString());
+        HashOperations<String, String, String> ho = redisTemplate.opsForHash();
+        ho.putAll(key, m);
     }
 
     private String lastHashKey(String roomId) {
-        return chatRedisProperties.cachePrefix() + ":r:" + roomId + ":last";
+        return chatRedisKeys.roomLastHashKey(requireRoomId(roomId));
+    }
+
+    private static String requireRoomId(String roomId) {
+        return Objects.requireNonNull(roomId, "roomId");
     }
 }
 

@@ -11,7 +11,9 @@ public record ChatRedisProperties(
         String streamKey,
         String streamGroupPrefix,
         Integer streamPollCount,
-        Long streamPollDelayMs
+        Long streamPollDelayMs,
+        Boolean clusterHashTagEnabled,
+        String clusterChatRoomHashTagName
 ) {
 
     public String resolvedBroadcastMode() {
@@ -36,6 +38,19 @@ public record ChatRedisProperties(
 
     public long resolvedStreamPollDelayMs() {
         return (streamPollDelayMs == null || streamPollDelayMs < 50) ? 200L : streamPollDelayMs;
+    }
+
+    public boolean resolvedClusterHashTagEnabled() {
+        return clusterHashTagEnabled == null || clusterHashTagEnabled;
+    }
+
+    /**
+     * Hash tag name inside braces. 예) {chatRoom:&lt;roomId&gt;}
+     */
+    public String resolvedClusterChatRoomHashTagName() {
+        return (clusterChatRoomHashTagName == null || clusterChatRoomHashTagName.isBlank())
+                ? "chatRoom"
+                : clusterChatRoomHashTagName.trim();
     }
 }
 
